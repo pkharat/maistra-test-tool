@@ -47,6 +47,7 @@ func TestTLSOriginationSDS(t *testing.T) {
 	sleep := examples.Sleep{"bookinfo"}
 	sleep.Install()
 	sleepPod, _ := util.GetPodName("bookinfo", "app=sleep")
+	util.Shell(`kubectl cp -n bookinfo /home/noiro/http_server/ca-cert.pem %s:/tmp/ -c sleep`,sleepPod)
 
 	t.Run("TrafficManagement_egress_gateway_perform_TLS_origination", func(t *testing.T) {
 		defer util.RecoverPanic(t)
@@ -55,7 +56,7 @@ func TestTLSOriginationSDS(t *testing.T) {
 		util.KubeApplyContents("bookinfo", ExServiceEntry)
 		time.Sleep(time.Duration(10) * time.Second)
 
-		command := `curl -sSL -o /dev/null -D - http://istio.io`
+		command := `curl --cacert /tmp/ca-cert.pem -sSL -o /dev/null -D - http://istio.io`
 		msg, err := util.PodExec("bookinfo", sleepPod, "sleep", command, false)
 		util.Inspect(err, "Failed to get response", "", t)
 		if strings.Contains(msg, "301 Moved Permanently") {
@@ -69,7 +70,7 @@ func TestTLSOriginationSDS(t *testing.T) {
 		util.KubeApplyContents("bookinfo", util.RunTemplate(ExGatewayTLSFileTemplate, smcp))
 		time.Sleep(time.Duration(20) * time.Second)
 
-		command = `curl -sSL -o /dev/null -D - http://istio.io`
+		command = `curl --cacert /tmp/ca-cert.pem -sSL -o /dev/null -D - http://istio.io`
 		msg, err = util.PodExec("bookinfo", sleepPod, "sleep", command, false)
 		util.Inspect(err, "Failed to get response", "", t)
 		if strings.Contains(msg, "301 Moved Permanently") || !strings.Contains(msg, "200") {
